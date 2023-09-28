@@ -1,17 +1,20 @@
 //SPDX-License-Identifier:MIT
 pragma solidity ^0.8.0;
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "forge-std/console.sol";
 
 contract DAO is ERC20
 {
-    /*info
+    /*info-----------------------------------------------------------
 
     cost of 1 vote=50 DAO
     1 ether=100 DAO tokens
 
-    info*/
+    info------------------------------------------------------------*/
 
-    //custom data types-start
+
+
+    //CUSTOM DATA TYPES-------------------------------------------BEGINS
     enum VotingStatus
     {
         notStarted, 
@@ -29,10 +32,13 @@ contract DAO is ERC20
         uint highestValue;
         uint[] results;
         uint winningOption;
+        bool result;
     }
-    //custom data types-end
+    //CUSTOM DATA TYPES-----------------------------------------------ENDS
 
-    //state variables-start
+
+
+    //STATE VARIABLES------------------------------------------------------BEGINS
     address payable public manager;
 
     uint public pollId;
@@ -41,7 +47,7 @@ contract DAO is ERC20
     //contains all the info about the proposals
     mapping(uint=>Proposals) public proposals;
 
-    //users[pollId]=votes cast 
+    //[users][pollId]=votes cast 
     //stores how many votes were cast by a user for any particular poll 
     mapping(address=>mapping(uint=>uint)) public votesCast;
 
@@ -50,9 +56,11 @@ contract DAO is ERC20
 
     //stores the time duraion when it was staked at
     mapping(address=>uint) public stakedAt;
-    //state variables-end
+    //STATE VARIABLES-------------------------------------------------------ENDS
 
-    //events-start
+
+
+    //EVENTS---------------------------------------------------------------BEGINS
     event newProposalDetails
     (
         uint pollId,
@@ -70,22 +78,26 @@ contract DAO is ERC20
     (
         uint tokensPurchased 
     );
-    //events-end
+    //EVENTS---------------------------------------------------------------ENDS
 
+
+    //MODIFIERS-----------------------------------------------------------BEGINS
     modifier onlyManager
     {
         require(msg.sender==manager,"Only the manager can call");
         _;
     }
+    //MODIFIERS-----------------------------------------------------------ENDS
 
     constructor() ERC20("DecentralizedAutonomousOrganization","DAO")
     {
         manager=payable(msg.sender); 
     } 
     
-    //Add new proposals 
+    //ADD NEW PROPOSALS()-----------------------------------------------------------------------BEGINS
     function newProposal(string memory proposal,string[] memory options) public returns(uint)
     {
+        require(balanceOf(msg.sender)>=25,"insufficient DAO");
         //costs 25 DAO tokens to add a poll
         _transfer(msg.sender, manager, 25);
         pollId++;
@@ -97,8 +109,9 @@ contract DAO is ERC20
             threshold:0,
             votingStatus:VotingStatus.notStarted,
             highestValue:0,
-            results:new uint[](0),
-            winningOption:0
+            results:new uint[](options.length),
+            winningOption:0,
+            result:false
         });
         emit newProposalDetails
         (
@@ -119,54 +132,43 @@ contract DAO is ERC20
              threshold
         );
     }
+    //ADD NEW PROPOSALS()-----------------------------------------------------------------ENDS
 
-    //tokens should be bought in multiples of 100 for simplicity 
-    function checkTokensCostInEther(uint tokens) public pure returns(uint)
-    {
-        //tokens/tokensPerEther
-        return tokens/100; 
-    }
 
+
+    //PURCHASE DAO TOKENS()--------------------------------------------------------------BEGINS
+    
     //tokens should be bought in multiples of 100 for simplicity 
     function purchaseDAOtokens(uint tokens) public payable 
     {
+        require(msg.value==(checkTokensCostInEther(tokens)*1 ether),"send the right amount");
         _mint(msg.sender, tokens);
         emit tokensPurchased
         (
             tokens
         );
     }
+    //PURCHASE DAO TOKENS()---------------------------------------------------------------ENDS
 
-    function checkDAOtokenBalance() public view returns(uint)
-    {
-        return balanceOf(msg.sender);
-    }
 
-    function checkVoteCost(uint _pollId) public view returns(uint)
-    {
-        return (((votesCast[msg.sender][_pollId])+1)**2)*50;
-    }
-
-    function proposalDetails(uint _pollId) public view returns(string memory,string[] memory)
-    {
-        return (proposals[_pollId].proposal,proposals[_pollId].options);
-    }
-
+    //VOTING----------------------------------------------------------------------------------------------------------BEGINS
     function changeVotingState(VotingStatus status,uint _pollId) public onlyManager
     {
         proposals[_pollId].votingStatus=status;
+        if((status==VotingStatus.completed)&&(proposals[_pollId].highestValue>proposals[_pollId].threshold))
+        {
+            proposals[_pollId].result=true;
+        }
+
     }
 
-    function checkVotingStatus(uint _pollId) public view returns(VotingStatus)
+    function vote(uint _pollId,uint option) public 
     {
-        return proposals[_pollId].votingStatus;
-    }
-
-    function vote(uint amount,uint _pollId,uint option) public 
-    {
+        uint amount=checkVoteCost(_pollId);
+        require(_pollId<=pollId && _pollId>0,"invalid poll ID");
         require(proposals[_pollId].votingStatus==VotingStatus.inProgress,"Voting isn't in progress");
-        require(amount==((((votesCast[msg.sender][_pollId])+1)**2)*50),"send the right amount to cast the vote");
-        require(balanceOf(msg.sender)>=amount,"insufficient balance");
+        //require(amount==((((votesCast[msg.sender][_pollId])+1)**2)*50),"send the right amount to cast the vote");
+        require(balanceOf(msg.sender)>=amount,"insufficient DAO");
         votesCast[msg.sender][_pollId]++;
         proposals[_pollId].results[option]++;
         if(proposals[_pollId].results[option]>proposals[_pollId].highestValue)
@@ -176,22 +178,19 @@ contract DAO is ERC20
         }
         _transfer(msg.sender, manager, amount);
     }
+    //VOTING---------------------------------------------------------------------------------------------------------------ENDS
 
-    function viewPollResults(uint _pollId) public view returns(uint,uint)
-    {
-        return (proposals[_pollId].highestValue,proposals[_pollId].winningOption);
-    }
 
+    //TRANSFERS TO MANAGER---------------------------------BEGINS
     function transferEthToManager() public onlyManager
     {
         manager.transfer(address(this).balance);
     }
+    //TRANSFERS TO MANAGER---------------------------------ENDS
 
-    function managerEthBalance() public view onlyManager returns(uint) 
-    {
-        return manager.balance; 
-    }
 
+
+    //STAKING-----------------------------------------------------------------BEGINS
     function stake(uint amount) public 
     {
         require(balanceOf(msg.sender)>=amount);
@@ -221,4 +220,51 @@ contract DAO is ERC20
         stakedAmount[msg.sender]-=amount;
         _transfer(manager, msg.sender, amount);
     }
+    //STAKING----------------------------------------------------------------ENDS
+
+    
+    //CHECK VALUES-----------------------------------------------------------------BEGINS
+    function checkDAOtokenBalance() public view returns(uint)
+    {
+        return balanceOf(msg.sender);
+    }
+
+    function checkVoteCost(uint _pollId) public view returns(uint)
+    {
+        return (((votesCast[msg.sender][_pollId])+1)**2)*50;
+    }
+
+    function checkProposalDetails(uint _pollId) public view returns(string memory,string[] memory)
+    {
+        return (proposals[_pollId].proposal,proposals[_pollId].options);
+    }
+
+    function checkVotingStatus(uint _pollId) public view returns(VotingStatus)
+    {
+        return proposals[_pollId].votingStatus;
+    }
+
+    function checkLiveVoteCount(uint _pollId) public view returns(uint,uint)
+    {
+        return (proposals[_pollId].highestValue,proposals[_pollId].winningOption);
+    }
+
+    function checkPollFinalResult(uint _pollId) public view returns(bool)
+    {
+        require(proposals[_pollId].votingStatus==VotingStatus.completed,"voting hasn't completed yet");
+        return proposals[_pollId].result;
+    }
+
+    function checkManagerEthBalance() public view onlyManager returns(uint) 
+    {
+        return manager.balance; 
+    }
+
+    //tokens should be bought in multiples of 100 for simplicity 
+    function checkTokensCostInEther(uint tokens) public pure returns(uint)
+    {
+        //tokens/tokensPerEther
+        return tokens/100; 
+    }
+    //CHECK VALUES-------------------------------------------------------------------------------------------ENDS
 }
