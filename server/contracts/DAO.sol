@@ -167,7 +167,6 @@ contract DAO is ERC20
         uint amount=checkVoteCost(_pollId);
         require(_pollId<=pollId && _pollId>0,"invalid poll ID");
         require(proposals[_pollId].votingStatus==VotingStatus.inProgress,"Voting isn't in progress");
-        //require(amount==((((votesCast[msg.sender][_pollId])+1)**2)*50),"send the right amount to cast the vote");
         require(balanceOf(msg.sender)>=amount,"insufficient DAO");
         votesCast[msg.sender][_pollId]++;
         proposals[_pollId].results[option]++;
@@ -205,12 +204,12 @@ contract DAO is ERC20
 
     function claim() public
     {
-        require(stakedAmount[msg.sender]>=0,"no stakes.nothing to claim");
+        require(stakedAmount[msg.sender]>0,"no stakes.nothing to claim");
         uint currentBlockTimeStamp=block.timestamp;
         uint rewards;
-        stakedAt[msg.sender]=currentBlockTimeStamp;
-        rewards=(stakedAmount[msg.sender])*(currentBlockTimeStamp-stakedAt[msg.sender])/3.154e7;
+        rewards=((currentBlockTimeStamp-stakedAt[msg.sender])%10)+((stakedAmount[msg.sender])%10);
         _mint(msg.sender, rewards);
+        stakedAt[msg.sender]=currentBlockTimeStamp;
     }
 
     function unStake(uint amount) public 
