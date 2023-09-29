@@ -13,8 +13,8 @@
   },
   "files": {
     "contracts/DAO.sol": {
-      "lastModificationDate": 1696000780715,
-      "contentHash": "67a835a77b24da46dbad0012b4c8e657",
+      "lastModificationDate": 1696021129203,
+      "contentHash": "a9e39c79c99b325b7ae5b315a1239520",
       "sourceName": "contracts/DAO.sol",
       "solcConfig": {
         "settings": {

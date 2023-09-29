@@ -55,6 +55,9 @@ contract DAO is ERC20
 
     //stores the time duraion when it was staked at
     mapping(address=>uint) public stakedAt;
+
+    //delegator=>validator=>true if delegated
+    mapping(address=>mapping(address=>bool)) delegates;
     //STATE VARIABLES-------------------------------------------------------ENDS
 
 
@@ -179,6 +182,26 @@ contract DAO is ERC20
         }
         _transfer(msg.sender, manager, amount);
     }
+
+    //function for the delegator to vote
+    function delegateVote(uint _pollId,uint option,address delegator) public
+    {
+        require(delegates[delegator][msg.sender]==true,"you aren't a delegator");
+        require(_pollId<=pollId && _pollId>0,"invalid poll ID");
+        uint amount=checkVoteCost(_pollId);
+        require(msg.sender!=proposals[_pollId].proposer && delegator!=proposals[_pollId].proposer,"you can't vote on your own poll");
+        require(proposals[_pollId].threshold>0,"Threshold isn't set yet");
+        require(proposals[_pollId].votingStatus==VotingStatus.inProgress,"Voting isn't in progress");
+        require(balanceOf(delegator)>=amount,"insufficient DAO");~
+        votesCast[delegator][_pollId]++;
+        proposals[_pollId].results[option]++;
+        if(proposals[_pollId].results[option]>proposals[_pollId].highestValue)
+        {
+            proposals[_pollId].highestValue=proposals[_pollId].results[option];
+            proposals[_pollId].winningOption=option;
+        }
+        _transfer(delegator, manager, amount);
+    }
     //VOTING---------------------------------------------------------------------------------------------------------------ENDS
 
 
@@ -190,11 +213,18 @@ contract DAO is ERC20
     //TRANSFERS TO MANAGER---------------------------------ENDS
 
 
+    //DELEGATION--------------------------------------------------------BEGINS
+    function delegation(address delegate) public 
+    {
+        delegates[msg.sender][delegate]=true;
+    }
+    //DELEGATION---------------------------------------------------------ENDS
+
 
     //STAKING-----------------------------------------------------------------BEGINS
     function stake(uint amount) public 
     {
-        require(balanceOf(msg.sender)>=amount);
+        require(balanceOf(msg.sender)>=amount,"insufficient DAO");
         if(stakedAmount[msg.sender]>0)
         {
             claim();
@@ -206,18 +236,22 @@ contract DAO is ERC20
 
     function claim() public
     {
-        require(stakedAmount[msg.sender]>0,"no stakes.nothing to claim");
+        require(stakedAmount[msg.sender]>0,"no tokens staked.nothing to claim");
         uint currentBlockTimeStamp=block.timestamp;
         uint rewards;
-        rewards=((currentBlockTimeStamp-stakedAt[msg.sender])%60)+((stakedAmount[msg.sender])%50);
+        rewards=((currentBlockTimeStamp-stakedAt[msg.sender])/60)+((stakedAmount[msg.sender])/50);
         _mint(msg.sender, rewards);
         stakedAt[msg.sender]=currentBlockTimeStamp;
     }
 
     function unStake(uint amount) public 
     {
-        require(stakedAmount[msg.sender]>=amount,"stakes are less");
-        claim();
+        require(stakedAmount[msg.sender]>=amount,"less tokens are staked");
+        if(block.timestamp>stakedAt[msg.sender]+60)
+        {
+            claim();
+        }
+        
         stakedAmount[msg.sender]-=amount;
         _transfer(manager, msg.sender, amount);
     }
@@ -247,6 +281,7 @@ contract DAO is ERC20
 
     function checkLiveVoteCount(uint _pollId) public view returns(uint,string memory)
     {
+        require(proposals[_pollId].votingStatus==VotingStatus.inProgress,"voting isn't in progress");
         return (proposals[_pollId].highestValue,proposals[_pollId].options[proposals[_pollId].winningOption]);
     }
 
@@ -254,6 +289,12 @@ contract DAO is ERC20
     {
         require(proposals[_pollId].votingStatus==VotingStatus.completed,"voting hasn't completed yet");
         return proposals[_pollId].options[proposals[_pollId].winningOption];
+    }
+
+    function checkPollResult(uint _pollId) public view returns(bool)
+    {
+        require(proposals[_pollId].votingStatus==VotingStatus.completed,"voting hasn't completed yet");
+        return proposals[_pollId].result;
     }
 
     function checkManagerEthBalance() public view onlyManager returns(uint) 
@@ -267,5 +308,12 @@ contract DAO is ERC20
         //tokens/tokensPerEther
         return tokens/100; 
     }
+
+    function checkDelegatorsBalance(address delegator) public view returns(uint) 
+    {
+        require(delegates[delegator][msg.sender]==true,"you aren't a delegator");
+        return balanceOf(delegator);
+    }
+
     //CHECK VALUES-------------------------------------------------------------------------------------------ENDS
 }
