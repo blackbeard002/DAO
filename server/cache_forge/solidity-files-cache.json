@@ -13,8 +13,8 @@
   },
   "files": {
     "contracts/DAO.sol": {
-      "lastModificationDate": 1695937807439,
-      "contentHash": "5b38e16c0356406ea9ec1e56d9cc6bc5",
+      "lastModificationDate": 1696000780715,
+      "contentHash": "67a835a77b24da46dbad0012b4c8e657",
       "sourceName": "contracts/DAO.sol",
       "solcConfig": {
         "settings": {
@@ -46,7 +46,6 @@
         }
       },
       "imports": [
-        "lib/forge-std/src/console.sol",
         "node_modules/@openzeppelin/contracts/token/ERC20/ERC20.sol",
         "node_modules/@openzeppelin/contracts/token/ERC20/IERC20.sol",
         "node_modules/@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol",

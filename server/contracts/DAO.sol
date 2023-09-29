@@ -1,7 +1,6 @@
 //SPDX-License-Identifier:MIT
 pragma solidity ^0.8.0;
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "forge-std/console.sol";
 
 contract DAO is ERC20
 {
@@ -139,9 +138,10 @@ contract DAO is ERC20
     //PURCHASE DAO TOKENS()--------------------------------------------------------------BEGINS
     
     //tokens should be bought in multiples of 100 for simplicity 
-    function purchaseDAOtokens(uint tokens) public payable 
+    function purchaseDAOtokens() public payable 
     {
-        require(msg.value==(checkTokensCostInEther(tokens)*1 ether),"send the right amount");
+        uint tokens;
+        tokens=(msg.value/1 ether)*100;
         _mint(msg.sender, tokens);
         emit tokensPurchased
         (
@@ -164,8 +164,10 @@ contract DAO is ERC20
 
     function vote(uint _pollId,uint option) public 
     {
-        uint amount=checkVoteCost(_pollId);
         require(_pollId<=pollId && _pollId>0,"invalid poll ID");
+        uint amount=checkVoteCost(_pollId);
+        require(msg.sender!=proposals[_pollId].proposer,"you can't vote on your own poll");
+        require(proposals[_pollId].threshold>0,"Threshold isn't set yet");
         require(proposals[_pollId].votingStatus==VotingStatus.inProgress,"Voting isn't in progress");
         require(balanceOf(msg.sender)>=amount,"insufficient DAO");
         votesCast[msg.sender][_pollId]++;
@@ -207,7 +209,7 @@ contract DAO is ERC20
         require(stakedAmount[msg.sender]>0,"no stakes.nothing to claim");
         uint currentBlockTimeStamp=block.timestamp;
         uint rewards;
-        rewards=((currentBlockTimeStamp-stakedAt[msg.sender])%10)+((stakedAmount[msg.sender])%10);
+        rewards=((currentBlockTimeStamp-stakedAt[msg.sender])%60)+((stakedAmount[msg.sender])%50);
         _mint(msg.sender, rewards);
         stakedAt[msg.sender]=currentBlockTimeStamp;
     }
@@ -243,15 +245,15 @@ contract DAO is ERC20
         return proposals[_pollId].votingStatus;
     }
 
-    function checkLiveVoteCount(uint _pollId) public view returns(uint,uint)
+    function checkLiveVoteCount(uint _pollId) public view returns(uint,string memory)
     {
-        return (proposals[_pollId].highestValue,proposals[_pollId].winningOption);
+        return (proposals[_pollId].highestValue,proposals[_pollId].options[proposals[_pollId].winningOption]);
     }
 
-    function checkPollFinalResult(uint _pollId) public view returns(bool)
+    function checkFinalResult(uint _pollId) public view returns(string memory)
     {
         require(proposals[_pollId].votingStatus==VotingStatus.completed,"voting hasn't completed yet");
-        return proposals[_pollId].result;
+        return proposals[_pollId].options[proposals[_pollId].winningOption];
     }
 
     function checkManagerEthBalance() public view onlyManager returns(uint) 
